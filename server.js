@@ -1,4 +1,4 @@
-// server.js (CommonJS - easiest on Windows)
+// server.js (CommonJS)
 const path = require("path");
 const fs = require("fs");
 const express = require("express");
@@ -9,33 +9,38 @@ const OpenAI = require("openai");
 dotenv.config();
 
 if (!process.env.OPENAI_API_KEY) {
-  console.error("❌ Missing OPENAI_API_KEY in .env");
+  console.error("❌ Missing OPENAI_API_KEY in env");
   process.exit(1);
 }
 
 const app = express();
 app.use(express.json());
 
-// GitHub Pages 오리진 허용
+// ✅ CORS: GitHub Pages 오리진 허용 + 프리플라이트 허용
 app.use(cors({
   origin: ["https://min-0126.github.io"],
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type"],
 }));
-app.options("*", cors()); // 🔑 모든 경로 OPTIONS OK
+app.options("*", cors()); // 프리플라이트(OPTIONS) 허용
 
-// 로컬 개발 시에만 프론트 폴더 서빙
+// ✅ 브라우저에서 확인용 라우트 (이게 없으면 'Cannot GET /'가 뜸)
+app.get("/", (req, res) => {
+  res.send("✅ Backend is up. Use POST /api/chat");
+});
+
+// ✅ 헬스 체크 (브라우저에서 바로 확인 가능)
+app.get("/health", (req, res) => {
+  res.json({ ok: true, hint: "Use POST /api/chat" });
+});
+
+// (선택) 로컬에 frontend 폴더가 있을 때만 정적 서빙
 const publicDir = path.join(__dirname, "..", "frontend");
 if (fs.existsSync(publicDir)) {
   app.use(express.static(publicDir));
 }
 
-//  health
-app.post("/health", (req, res) => {
-  res.json({ reply: "✅ Backend is alive. Use /api/chat for real answers." });
-});
-
-//  Chat endpoint that calls OpenAI
+// 🤖 Chat endpoint: OpenAI 호출
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.post("/api/chat", async (req, res) => {
@@ -53,13 +58,12 @@ app.post("/api/chat", async (req, res) => {
       ],
     });
 
-    const text = response.output_text;
-    res.json({ reply: text });
+    res.json({ reply: response.output_text });
   } catch (err) {
     console.error("OpenAI error:", err?.response?.data || err.message || err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-const port = process.env.PORT || 3000; 
-app.listen(port, () => console.log(` Server running on port ${port}`));
+const port = process.env.PORT || 3000; // Render가 PORT를 넣어줌
+app.listen(port, () => console.log(`✅ Server running on port ${port}`));
