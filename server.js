@@ -24,7 +24,16 @@ app.use(cors({
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type"],
 }));
-app.options("*", cors()); // 프리플라이트(OPTIONS) 허용
+
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    res.header("Access-Control-Allow-Origin", "https://min-0126.github.io");
+    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type");
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 // ✅ 브라우저에서 확인용 라우트 (이게 없으면 'Cannot GET /'가 뜸)
 app.get("/", (req, res) => {
