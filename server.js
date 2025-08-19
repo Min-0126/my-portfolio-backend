@@ -63,7 +63,7 @@ app.post("/api/chat", async (req, res) => {
 
     const model = process.env.MODEL || "gpt-4o-mini";
 
-    // ✅ Chat Completions (호환성 가장 좋음)
+    // ✅ Chat Completions로 변경 (가장 호환성 좋음)
     const result = await openai.chat.completions.create({
       model,
       messages: [
