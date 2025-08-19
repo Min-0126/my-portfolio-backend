@@ -63,20 +63,28 @@ app.post("/api/chat", async (req, res) => {
 
     const model = process.env.MODEL || "gpt-4o-mini";
 
-    // ✅ Responses API - typed content parts
-    const r = await openai.responses.create({
+    // ✅ Chat Completions (호환성 가장 좋음)
+    const result = await openai.chat.completions.create({
       model,
-      input: [
-        {
-          role: "system",
-          content: [{ type: "text", text: "You are a helpful assistant for a personal portfolio site." }]
-        },
-        {
-          role: "user",
-          content: [{ type: "text", text: userMessage }]
-        }
+      messages: [
+        { role: "system", content: "You are a helpful assistant for a personal portfolio site." },
+        { role: "user",   content: userMessage }
       ],
+      temperature: 0.7,
     });
+
+    const text = result.choices?.[0]?.message?.content?.trim() || "";
+    res.json({ reply: text || "(empty)" });
+
+  } catch (err) {
+    const status = err?.status || err?.response?.status || 500;
+    console.error("OpenAI error DETAIL:", err?.response?.data || err);
+    return res.status(status).json({
+      error: err?.response?.data?.error?.message || err?.message || "Server error",
+      code: status,
+    });
+  }
+});
 
     // 안전하게 텍스트 뽑기
     const text =
