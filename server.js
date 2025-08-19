@@ -16,23 +16,26 @@ if (!process.env.OPENAI_API_KEY) {
 const app = express();
 app.use(express.json());
 
-// 🔒 GitHub Pages 오리진 허용 (경로 /WebPage는 넣지 않음)
+// GitHub Pages 오리진 허용
 app.use(cors({
   origin: ["https://min-0126.github.io"],
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"],
 }));
+app.options("*", cors()); // 🔑 모든 경로 OPTIONS OK
 
-// (선택) 로컬 개발 시에만 프론트 폴더 서빙
+// 로컬 개발 시에만 프론트 폴더 서빙
 const publicDir = path.join(__dirname, "..", "frontend");
 if (fs.existsSync(publicDir)) {
   app.use(express.static(publicDir));
 }
 
-// ✅ health
+//  health
 app.post("/health", (req, res) => {
   res.json({ reply: "✅ Backend is alive. Use /api/chat for real answers." });
 });
 
-// 🤖 Chat endpoint that calls OpenAI
+//  Chat endpoint that calls OpenAI
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.post("/api/chat", async (req, res) => {
@@ -58,5 +61,5 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-const port = process.env.PORT || 3000; // Render가 PORT 넣어줌
-app.listen(port, () => console.log(`✅ Server running on port ${port}`));
+const port = process.env.PORT || 3000; 
+app.listen(port, () => console.log(` Server running on port ${port}`));
