@@ -61,20 +61,47 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ error: "Empty message" });
     }
 
-    const response = await openai.responses.create({
-      model: process.env.MODEL || "gpt-4o-mini",
+    const model = process.env.MODEL || "gpt-4o-mini";
+
+    // ✅ Responses API - typed content parts
+    const r = await openai.responses.create({
+      model,
       input: [
-        { role: "system", content: "You are a helpful assistant for a personal portfolio site." },
-        { role: "user", content: userMessage }
+        {
+          role: "system",
+          content: [{ type: "text", text: "You are a helpful assistant for a personal portfolio site." }]
+        },
+        {
+          role: "user",
+          content: [{ type: "text", text: userMessage }]
+        }
       ],
     });
 
-    res.json({ reply: response.output_text });
+    // 안전하게 텍스트 뽑기
+    const text =
+      r.output_text ??
+      (r.output?.[0]?.content?.[0]?.text ?? "") ||
+      "";
+
+    if (!text) {
+      // 혹시 구조가 바뀐 경우 대비
+      return res.json({ reply: JSON.stringify(r) });
+    }
+
+    res.json({ reply: text });
   } catch (err) {
-    console.error("OpenAI error:", err?.response?.data || err.message || err);
-    res.status(500).json({ error: "Server error" });
+    // 🔍 자세한 에러를 로그 + 클라이언트로 전파(개발 중에만 유용)
+    const status = err?.status || err?.response?.status || 500;
+    const payload = err?.response?.data || { message: err?.message || "Unknown error" };
+    console.error("OpenAI error DETAIL:", payload);
+
+    // 클라이언트에도 이유를 보여줘서 빠르게 해결
+    return res.status(status).json({
+      error: payload?.error?.message || payload?.message || "Server error",
+      code: status,
+    });
   }
 });
-
 const port = process.env.PORT || 3000; // Render가 PORT를 넣어줌
 app.listen(port, () => console.log(`✅ Server running on port ${port}`));
