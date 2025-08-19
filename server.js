@@ -1,4 +1,4 @@
-// server.js (CommonJS)
+// server.js (Express 5 + OpenAI Chat Completions)
 const path = require("path");
 const fs = require("fs");
 const express = require("express");
@@ -7,7 +7,6 @@ const dotenv = require("dotenv");
 const OpenAI = require("openai");
 
 dotenv.config();
-
 console.log("BOOT => hasKey:", !!process.env.OPENAI_API_KEY, " node:", process.version);
 
 if (!process.env.OPENAI_API_KEY) {
@@ -18,16 +17,16 @@ if (!process.env.OPENAI_API_KEY) {
 const app = express();
 app.use(express.json());
 
-// ✅ CORS: GitHub Pages 오리진 허용 + 프리플라이트 허용
+// CORS (GitHub Pages 오리진 허용) + 프리플라이트(OPTIONS) 직접 허용
+const ALLOW_ORIGIN = "https://min-0126.github.io";
 app.use(cors({
-  origin: ["https://min-0126.github.io"],
+  origin: [ALLOW_ORIGIN],
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type"],
 }));
-
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
-    res.header("Access-Control-Allow-Origin", "https://min-0126.github.io");
+    res.header("Access-Control-Allow-Origin", ALLOW_ORIGIN);
     res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     res.header("Access-Control-Allow-Headers", "Content-Type");
     return res.sendStatus(204);
@@ -35,15 +34,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ 브라우저에서 확인용 라우트 (이게 없으면 'Cannot GET /'가 뜸)
-app.get("/", (req, res) => {
-  res.send("✅ Backend is up. Use POST /api/chat");
-});
-
-// ✅ 헬스 체크 (브라우저에서 바로 확인 가능)
-app.get("/health", (req, res) => {
-  res.json({ ok: true, hint: "Use POST /api/chat" });
-});
+// 브라우저 확인용
+app.get("/", (req, res) => res.send("✅ Backend is up. Use POST /api/chat"));
+app.get("/health", (req, res) => res.json({ ok: true }));
 
 // (선택) 로컬에 frontend 폴더가 있을 때만 정적 서빙
 const publicDir = path.join(__dirname, "..", "frontend");
@@ -51,9 +44,9 @@ if (fs.existsSync(publicDir)) {
   app.use(express.static(publicDir));
 }
 
-// 🤖 Chat endpoint: OpenAI 호출
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// === Chat endpoint (Chat Completions) ===
 app.post("/api/chat", async (req, res) => {
   try {
     const userMessage = String(req.body?.message ?? "");
@@ -63,7 +56,6 @@ app.post("/api/chat", async (req, res) => {
 
     const model = process.env.MODEL || "gpt-4o-mini";
 
-    // ✅ Chat Completions로 변경 (가장 호환성 좋음)
     const result = await openai.chat.completions.create({
       model,
       messages: [
@@ -73,43 +65,24 @@ app.post("/api/chat", async (req, res) => {
       temperature: 0.7,
     });
 
-    const text = result.choices?.[0]?.message?.content?.trim() || "";
-    res.json({ reply: text || "(empty)" });
-
-  } catch (err) {
-    const status = err?.status || err?.response?.status || 500;
-    console.error("OpenAI error DETAIL:", err?.response?.data || err);
-    return res.status(status).json({
-      error: err?.response?.data?.error?.message || err?.message || "Server error",
-      code: status,
-    });
-  }
-});
-
-    // 안전하게 텍스트 뽑기
     const text =
-      r.output_text ??
-      (r.output?.[0]?.content?.[0]?.text ?? "") ||
-      "";
+      (result.choices &&
+       result.choices[0] &&
+       result.choices[0].message &&
+       result.choices[0].message.content || "").trim();
 
-    if (!text) {
-      // 혹시 구조가 바뀐 경우 대비
-      return res.json({ reply: JSON.stringify(r) });
-    }
+    return res.json({ reply: text });
 
-    res.json({ reply: text });
   } catch (err) {
-    // 🔍 자세한 에러를 로그 + 클라이언트로 전파(개발 중에만 유용)
     const status = err?.status || err?.response?.status || 500;
-    const payload = err?.response?.data || { message: err?.message || "Unknown error" };
-    console.error("OpenAI error DETAIL:", payload);
-
-    // 클라이언트에도 이유를 보여줘서 빠르게 해결
+    const detail = err?.response?.data || { message: err?.message || "Server error" };
+    console.error("OpenAI error DETAIL:", detail);
     return res.status(status).json({
-      error: payload?.error?.message || payload?.message || "Server error",
+      error: detail?.error?.message || detail?.message || "Server error",
       code: status,
     });
   }
 });
-const port = process.env.PORT || 3000; // Render가 PORT를 넣어줌
+
+const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`✅ Server running on port ${port}`));
