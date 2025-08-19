@@ -8,6 +8,8 @@ const OpenAI = require("openai");
 
 dotenv.config();
 
+console.log("BOOT => hasKey:", !!process.env.OPENAI_API_KEY, " node:", process.version);
+
 if (!process.env.OPENAI_API_KEY) {
   console.error("❌ Missing OPENAI_API_KEY in env");
   process.exit(1);
